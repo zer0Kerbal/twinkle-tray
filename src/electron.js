@@ -6,6 +6,7 @@ const { exec } = require('child_process');
 const os = require("os")
 const ua = require('universal-analytics');
 const uuid = require('uuid/v4');
+const w32disp = require("win32-displayconfig");
 
 let isDev = false
 try {
@@ -887,7 +888,7 @@ refreshMonitors = async (fullRefresh = false, bypassRateLimit = false) => {
   const startTime = process.hrtime()
   try {
     const wmiPromise = refreshWMI()
-    const namesPromise = refreshNames()
+    const namesPromise = refreshNames2()
     const ddcciPromise = refreshDDCCI()
 
     namesPromise.then(() => { console.log(`NAMES done in ${process.hrtime(startTime)[1] / 1000000}ms`) })
@@ -2132,5 +2133,66 @@ function handleBackgroundUpdate() {
   }
 
   checkForUpdates()
+
+}
+
+const startTime1 = process.hrtime()
+w32disp.queryDisplayConfig().then((config) => {
+  let displays = []
+  config.nameArray.forEach((display, idx) => {
+    if(display.monitorDevicePath) displays.push(display);
+  })
+  console.log(`NAMES1 done in ${process.hrtime(startTime1)[1] / 1000000}ms`)
+  console.log(
+    displays
+  );
+});
+
+
+
+
+refreshNames2 = () => {
+
+  return new Promise((resolve, reject) => {
+
+    let foundMonitors = []
+
+    w32disp.queryDisplayConfig().then((config) => {
+      let displays = []
+      config.nameArray.forEach((display, idx) => {
+        if (display.monitorDevicePath) displays.push(display);
+      })
+
+      for (let monitor of displays) {
+        const hwid = monitor.monitorDevicePath.split("#")
+        hwid[2] = hwid[2].split("_")[0]
+
+        foundMonitors.push(hwid[2])
+
+        if (monitors[hwid[2]] == undefined) {
+          monitors[hwid[2]] = {
+            id: monitor.monitorDevicePath,
+            key: hwid[2],
+            num: false,
+            brightness: 50,
+            type: 'none',
+            min: 0,
+            max: 100,
+            hwid: false,
+            name: false,
+            serial: false
+          }
+        }
+
+        monitors[hwid[2]].name = monitor.monitorFriendlyDeviceName
+
+      }
+
+      resolve(foundMonitors)
+
+    });
+
+
+  })
 
 }
